@@ -439,7 +439,6 @@ class Hotlinked_Images {
             </div>
 			<?php
         } elseif ($finded_img > $downloaded) {
-		    var_dump($finded_img, $downloaded);
 			?>
             <div class="notice notice-warning is-dismissible">
                 <p><?php printf( __( 'Some hotlinked images of post “%s” can be downloaded', 'hli' ), $post->post_title ); ?></p>
