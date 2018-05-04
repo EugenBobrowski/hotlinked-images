@@ -397,7 +397,7 @@ class Hotlinked_Images {
 
 		if ( ! count( $images ) ) {
 			?>
-            <div class="notice notice-error">
+            <div class="notice notice-warning">
                 <p><?php printf( __( 'The hotlinked images of post “%s” was not founded', 'hli' ), $post->post_title ); ?></p>
             </div>
 			<?php
@@ -429,11 +429,30 @@ class Hotlinked_Images {
 			) );
 		}
 
-		?>
-        <div class="notice notice-success is-dismissible">
-            <p><?php printf( __( 'The hotlinked images of post “%s” was downloaded', 'hli' ), $post->post_title ); ?></p>
-        </div>
-		<?php
+		$finded_img = count($images);
+		$downloaded = count($this->pulling[ $post->ID ]);
+
+		if ($downloaded == 0) {
+			?>
+            <div class="notice notice-warning is-dismissible">
+                <p><?php printf( __( 'No one hotlinked images of post “%s” can be downloaded', 'hli' ), $post->post_title ); ?></p>
+            </div>
+			<?php
+        } elseif ($finded_img > $downloaded) {
+		    var_dump($finded_img, $downloaded);
+			?>
+            <div class="notice notice-warning is-dismissible">
+                <p><?php printf( __( 'Some hotlinked images of post “%s” can be downloaded', 'hli' ), $post->post_title ); ?></p>
+            </div>
+			<?php
+		} else {
+			?>
+            <div class="notice notice-success is-dismissible">
+                <p><?php printf( __( 'The hotlinked images of post “%s” was downloaded', 'hli' ), $post->post_title ); ?></p>
+            </div>
+			<?php
+        }
+
 		return true;
 	}
 
