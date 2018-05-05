@@ -35,7 +35,15 @@ class Hotlinked_Images {
 		}
 		if ( $direct ) {
 			$this->direct_page();
-		}
+		} else {
+			if (!wp_next_scheduled('hli_cron_search_and_pull')) {
+				wp_schedule_single_event(time(), 'hli_cron_search_and_pull');
+			}
+
+			add_action('hli_cron_search_and_pull', array($this, 'cron_search_and_pull'));
+			add_action('wp_ajax_cron_search_and_pull', array($this, 'cron_search_and_pull'));
+
+        }
 
 	}
 
@@ -51,6 +59,18 @@ class Hotlinked_Images {
 		$result = $this->query();
 
 		$this->pull_images( $result );
+
+		$option = get_option('hli_cron', array(
+				'current_page' => 1,
+				'founded' => array(),
+				'messages' => '',
+			)
+		);
+        if (!empty($option['messages'])) {
+	        echo $option['messages'];
+	        $option['messages'] = '';
+	        update_option('hli_cron', $option);
+        }
 
 		$url = remove_query_arg('pull_images_of_post');
 
@@ -293,9 +313,9 @@ class Hotlinked_Images {
 			$this->found_posts   = $q->found_posts;
 			$this->max_num_pages = $q->max_num_pages;
 
-			echo '<p>$query1->post_count: ' . $q->post_count . '</p>';
-			echo '<p>$query1->found_posts: ' . $q->found_posts . '</p>';
-			echo '<p>$query1->max_num_pages: ' . $q->max_num_pages . '</p>';
+//			echo '<p>$query1->post_count: ' . $q->post_count . '</p>';
+//			echo '<p>$query1->found_posts: ' . $q->found_posts . '</p>';
+//			echo '<p>$query1->max_num_pages: ' . $q->max_num_pages . '</p>';
 
 			while ( $q->have_posts() ) {
 				$q->the_post();
@@ -358,6 +378,85 @@ class Hotlinked_Images {
 
 	}
 
+	#region cron
+
+    public function cron_search_and_pull() {
+	    file_put_contents(__DIR__ . '/hli.log', PHP_EOL . time() . PHP_EOL, FILE_APPEND);
+
+	    set_time_limit(0);
+	    ini_set("default_socket_timeout", "0");
+
+	    $option = get_option('hli_cron', array(
+			    'current_page' => 1,
+                'founded' => array(),
+			    'messages' => '',
+            )
+	    );
+
+	    var_dump($option);
+
+	    if (count($option['founded'])) {
+	        $this->end_cron_job($option);
+	        wp_die();
+	    }
+
+	    $this->posts_per_page = 5;
+	    $this->page = $option['current_page'];
+
+	    $founded = $this->query();
+
+	    var_dump($founded);
+
+	    file_put_contents(__DIR__ . '/hli.log', 'Page ' . $this->page . ' of ' . $this->max_num_pages . PHP_EOL, FILE_APPEND);
+
+	    foreach ( $founded as $post_id => $report ) {
+		    if ( count( $report['founded'] ) ) {
+			    $option['founded'][$post_id] = $report;
+		    }
+	    }
+
+        $this->end_cron_job($option);
+	    wp_die();
+
+
+    }
+
+    public function end_cron_job($option) {
+
+	    if (count($option['founded'])) {
+		    reset($option['founded']);
+		    $post_id = key($option['founded']);
+
+		    ob_start();
+		    $this->pull_post_images($post_id);
+		    unset($option['founded'][$post_id]);
+
+		    $option['messages'] .= ob_get_clean();
+		    var_dump($post_id);
+	    }
+
+
+	    if (!count($option['founded'])) {
+		    $is_last = ($this->max_num_pages == $this->page);
+
+		    if ($is_last) {
+			    $option['current_page'] = 1;
+			    $option['founded'] = array();
+			    $next = time() + (3600 * 24 * 1);
+		    } else {
+			    $option['current_page']++;
+			    $next = time() + (600);
+		    }
+        } else {
+		    $next = time() + (600);
+        }
+
+	    update_option('hli_cron', $option);
+
+	    wp_schedule_single_event($next, 'hli_cron_search_and_pull');
+    }
+
+	#endregion cron
 	#region download
 
 	/**
@@ -398,7 +497,7 @@ class Hotlinked_Images {
 		if ( ! count( $images ) ) {
 			?>
             <div class="notice notice-warning">
-                <p><?php printf( __( 'The hotlinked images of post “%s” was not founded', 'hli' ), $post->post_title ); ?></p>
+                <p><?php printf( __( 'The hotlinked images of post “<a href="%s" target="_blank">%s</a>” was not founded', 'hli' ), get_permalink($post), $post->post_title ); ?></p>
             </div>
 			<?php
 			return false;
@@ -435,19 +534,19 @@ class Hotlinked_Images {
 		if ($downloaded == 0) {
 			?>
             <div class="notice notice-warning is-dismissible">
-                <p><?php printf( __( 'No one hotlinked images of post “%s” can be downloaded', 'hli' ), $post->post_title ); ?></p>
+                <p><?php printf( __( 'No one hotlinked images of post “<a href="%s" target="_blank">%s</a>” can be downloaded', 'hli' ), get_permalink($post), $post->post_title ); ?></p>
             </div>
 			<?php
         } elseif ($finded_img > $downloaded) {
 			?>
             <div class="notice notice-warning is-dismissible">
-                <p><?php printf( __( 'Some hotlinked images of post “%s” can be downloaded', 'hli' ), $post->post_title ); ?></p>
+                <p><?php printf( __( 'Some hotlinked images of post “<a href="%s" target="_blank">%s</a>” can be downloaded', 'hli' ), get_permalink($post), $post->post_title ); ?></p>
             </div>
 			<?php
 		} else {
 			?>
             <div class="notice notice-success is-dismissible">
-                <p><?php printf( __( 'The hotlinked images of post “%s” was downloaded', 'hli' ), $post->post_title ); ?></p>
+                <p><?php printf( __( 'The hotlinked images of post “<a href="%s" target="_blank">%s</a>” was downloaded', 'hli' ), get_permalink($post), $post->post_title ); ?></p>
             </div>
 			<?php
         }
