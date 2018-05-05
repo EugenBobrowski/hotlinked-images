@@ -604,6 +604,9 @@ class Hotlinked_Images {
 		// Assign metadata to attachment
 		wp_update_attachment_metadata( $attach_id, $attach_data );
 
+		// Save download url
+        update_post_meta($attach_id, 'hli_source', $url);
+
 		return $attach_id;
 
 	}
