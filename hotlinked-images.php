@@ -381,8 +381,6 @@ class Hotlinked_Images {
 	#region cron
 
     public function cron_search_and_pull() {
-	    file_put_contents(__DIR__ . '/hli.log', PHP_EOL . time() . PHP_EOL, FILE_APPEND);
-
 	    set_time_limit(0);
 	    ini_set("default_socket_timeout", "0");
 
@@ -393,7 +391,8 @@ class Hotlinked_Images {
             )
 	    );
 
-	    var_dump($option);
+	    $this->log(' Cron job start with $option ' . print_r($option, true));
+
 
 	    if (count($option['founded'])) {
 	        $this->end_cron_job($option);
@@ -405,9 +404,7 @@ class Hotlinked_Images {
 
 	    $founded = $this->query();
 
-	    var_dump($founded);
-
-	    file_put_contents(__DIR__ . '/hli.log', 'Page ' . $this->page . ' of ' . $this->max_num_pages . PHP_EOL, FILE_APPEND);
+	    $this->log('parse page ' . $this->page . ' of ' . $this->max_num_pages );
 
 	    foreach ( $founded as $post_id => $report ) {
 		    if ( count( $report['founded'] ) ) {
@@ -415,9 +412,11 @@ class Hotlinked_Images {
 		    }
 	    }
 
-        $this->end_cron_job($option);
-	    wp_die();
+	    $this->log('Add posts to $option: ' . print_r($option, true));
 
+        $this->end_cron_job($option);
+
+	    wp_die();
 
     }
 
@@ -432,7 +431,8 @@ class Hotlinked_Images {
 		    unset($option['founded'][$post_id]);
 
 		    $option['messages'] .= ob_get_clean();
-		    var_dump($post_id);
+
+		    $this->log('pull images by cron for post ID ' . $post_id . ' ' . get_the_title($post_id));
 	    }
 
 
@@ -454,6 +454,8 @@ class Hotlinked_Images {
 	    update_option('hli_cron', $option);
 
 	    wp_schedule_single_event($next, 'hli_cron_search_and_pull');
+
+	    $this->log('Cron job ends' . PHP_EOL . PHP_EOL . '------------------------------------');
     }
 
 	#endregion cron
@@ -607,6 +609,22 @@ class Hotlinked_Images {
 	}
 
 	#endregion download
+	#region logging
+
+    public function log($text) {
+
+	    $time = date(DATE_ATOM);
+
+	    $text = $time . ' ' . $text . PHP_EOL . PHP_EOL;
+
+	    $file = wp_upload_dir();
+	    $file = $file['basedir'] . '/hli.log';
+//	    $file = __DIR__ . '/hli.log';
+
+	    file_put_contents($file, $text, FILE_APPEND);
+    }
+
+	#endregion logging
 
 	public static function get_instance() {
 		if ( null === self::$instance ) {
